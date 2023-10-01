@@ -1,12 +1,12 @@
 package main
 
 import (
+	"github.com/ashish493/ormen/deck"
 	"github.com/ashish493/ormen/sail"
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
 
 	"fmt"
-	"time"
 
 	"github.com/golang-collections/collections/queue"
 
@@ -14,6 +14,8 @@ import (
 )
 
 func main() {
+
+	//chapter -3
 	// s := sail.Sail{
 	// 	ID:     uuid.New(),
 	// 	Name:   "Sail-1",
@@ -74,49 +76,138 @@ func main() {
 	// fmt.Printf("stopping container %s\n", createResult.ContainerId)
 	// _ = stopContainer(dockerTask)
 
-	db := make(map[uuid.UUID]sail.Sail)
+	//chapter -4
+	// db := make(map[uuid.UUID]sail.Sail)
+	// w := sailor.Sailor{
+	// 	Queue: *queue.New(),
+	// 	Db:    db,
+	// }
+
+	// t := sail.Sail{
+	// 	ID:    uuid.New(),
+	// 	Name:  "test-container-1",
+	// 	State: sail.Scheduled,
+	// 	Image: "strm/helloworld-http",
+	// }
+
+	// t2 := sail.Sail{
+	// 	ID:    uuid.New(),
+	// 	Name:  "test-container-2",
+	// 	State: sail.Scheduled,
+	// 	Image: "grafana/grafana",
+	// }
+
+	// // first time the worker will see the sail
+	// fmt.Println("starting sail")
+	// w.AddTask(t)
+	// w.AddTask(t2)
+	// result := w.RunTask()
+	// if result.Error != nil {
+	// 	panic(result.Error)
+	// }
+
+	// t.ContainerID = result.ContainerId
+
+	// fmt.Printf("sail %s is running in container %s\n", t.ID, t.ContainerID)
+	// fmt.Println("Sleepy time")
+	// time.Sleep(time.Second * 50)
+
+	// fmt.Printf("stopping sail %s\n", t.ID)
+	// t.State = sail.Completed
+	// w.AddTask(t)
+	// result = w.RunTask()
+	// if result.Error != nil {
+	// 	panic(result.Error)
+	// }
+
+	//chapter 7
+	// host := os.Getenv("CUBE_HOST")
+	// port, _ := strconv.Atoi(os.Getenv("CUBE_PORT"))
+	// host := "localhost"
+	// port := 8080
+	// fmt.Println("Starting Cube worker")
+
+	// w := sailor.Sailor{
+	// 	Queue: *queue.New(),
+	// 	Db:    make(map[uuid.UUID]sail.Sail),
+	// }
+
+	// api := sailor.Api{Address: host, Port: port, Worker: &w}
+	// // fmt.Println(host, port, "host:port")
+	// // fmt.Print(api)
+	// go w.RunTasks()
+	// go w.CollectStats()
+	// go api.Start()
+
+	// workers := []string{fmt.Sprintf("%s:%d", host, port)}
+	// m := deck.New(workers)
+
+	// for i := 0; i < 3; i++ {
+	// 	t := sail.Sail{
+	// 		ID:    uuid.New(),
+	// 		Name:  fmt.Sprintf("test-container-%d", i),
+	// 		State: sail.Scheduled,
+	// 		Image: "strm/helloworld-http",
+	// 	}
+	// 	te := sail.SailEvent{
+	// 		ID:    uuid.New(),
+	// 		State: sail.Running,
+	// 		Sail:  t,
+	// 	}
+	// 	m.AddTask(te)
+	// 	m.SendWork()
+	// }
+
+	// go func() {
+	// 	for {
+	// 		fmt.Printf("[Manager] Updating tasks from %d workers\n", len(m.Workers))
+	// 		m.UpdateTasks()
+	// 		time.Sleep(15 * time.Second)
+	// 	}
+	// }()
+
+	// for {
+	// 	for _, t := range m.TaskDb {
+	// 		fmt.Printf("[Manager] Task: id: %s, state: %d\n", t.ID, t.State)
+	// 		time.Sleep(15 * time.Second)
+	// 	}
+	// }
+
+	// whost := os.Getenv("CUBE_WORKER_HOST")
+	// wport, _ := strconv.Atoi(os.Getenv("CUBE_WORKER_PORT"))
+	whost := "localhost"
+	wport := 8080
+
+	mhost := "localhost"
+	mport := 8081
+
+	// mhost := os.Getenv("CUBE_MANAGER_HOST")
+	// mport, _ := strconv.Atoi(os.Getenv("CUBE_MANAGER_PORT"))
+
+	fmt.Println("Starting Cube worker")
+
 	w := sailor.Sailor{
 		Queue: *queue.New(),
-		Db:    db,
+		Db:    make(map[uuid.UUID]sail.Sail),
 	}
+	wapi := sailor.Api{Address: whost, Port: wport, Worker: &w}
 
-	t := sail.Sail{
-		ID:    uuid.New(),
-		Name:  "test-container-1",
-		State: sail.Scheduled,
-		Image: "strm/helloworld-http",
-	}
+	go w.RunTasks()
+	go w.CollectStats()
+	go w.UpdateTasks()
+	go wapi.Start()
 
-	t2 := sail.Sail{
-		ID:    uuid.New(),
-		Name:  "test-container-2",
-		State: sail.Scheduled,
-		Image: "grafana/grafana",
-	}
+	fmt.Println("Starting Cube manager")
 
-	// first time the worker will see the sail
-	fmt.Println("starting sail")
-	w.AddTask(t)
-	w.AddTask(t2)
-	result := w.RunTask()
-	if result.Error != nil {
-		panic(result.Error)
-	}
+	workers := []string{fmt.Sprintf("%s:%d", whost, wport)}
+	m := deck.New(workers)
+	mapi := deck.Api{Address: mhost, Port: mport, Manager: m}
 
-	t.ContainerID = result.ContainerId
+	go m.ProcessTasks()
+	go m.UpdateTasks()
+	go m.DoHealthChecks()
 
-	fmt.Printf("sail %s is running in container %s\n", t.ID, t.ContainerID)
-	fmt.Println("Sleepy time")
-	time.Sleep(time.Second * 50)
-
-	fmt.Printf("stopping sail %s\n", t.ID)
-	t.State = sail.Completed
-	w.AddTask(t)
-	result = w.RunTask()
-	if result.Error != nil {
-		panic(result.Error)
-	}
-
+	mapi.Start()
 }
 
 func createContainer() (*sail.Docker, *sail.DockerResult) {

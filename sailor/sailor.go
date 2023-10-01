@@ -16,7 +16,41 @@ type Sailor struct {
 	Name      string
 	Queue     queue.Queue
 	Db        map[uuid.UUID]sail.Sail
+	Stats     *Stats
 	SailCount int
+}
+
+func (w *Sailor) RunTasks() {
+	for {
+		if w.Queue.Len() != 0 {
+			result := w.runTask()
+			if result.Error != nil {
+				log.Printf("Error running task: %v\n", result.Error)
+			}
+		} else {
+			log.Printf("No tasks to process currently.\n")
+		}
+		log.Println("Sleeping for 10 seconds.")
+		time.Sleep(10 * time.Second)
+	}
+
+}
+
+func (s *Sailor) CollectStats() {
+	for {
+		log.Println("Collecting stats")
+		s.Stats = GetStats()
+		s.SailCount = s.Stats.TaskCount
+		time.Sleep(15 * time.Second)
+	}
+}
+
+func (s *Sailor) GetTasks() []*sail.Sail {
+	tasks := []*sail.Sail{}
+	for _, t := range s.Db {
+		tasks = append(tasks, &t)
+	}
+	return tasks
 }
 
 func (s *Sailor) Collections() {
@@ -26,7 +60,7 @@ func (s *Sailor) AddTask(t sail.Sail) {
 	s.Queue.Enqueue(t)
 }
 
-func (s *Sailor) RunTask() sail.DockerResult {
+func (s *Sailor) runTask() sail.DockerResult {
 	fmt.Println("Task will run ")
 	t := s.Queue.Dequeue()
 	if t == nil {
@@ -96,4 +130,56 @@ func (s *Sailor) StartTask(t sail.Sail) sail.DockerResult {
 	s.Db[t.ID] = t
 
 	return result
+}
+
+func (w *Sailor) InspectTask(t sail.Sail) sail.DockerInspectResponse {
+	config := sail.NewConfig(&t)
+	d := sail.NewDocker(config)
+	return d.Inspect(t.ContainerID)
+}
+
+func (w *Sailor) UpdateTasks() {
+	for {
+		log.Println("Checking status of tasks")
+		w.updateTasks()
+		log.Println("Task updates completed")
+		log.Println("Sleeping for 15 seconds")
+		time.Sleep(15 * time.Second)
+	}
+}
+
+func (w *Sailor) updateTasks() {
+	// for each task in the worker's datastore:
+	// 1. call InspectTask method
+	// 2. verify task is in running state
+	// 3. if task is not in running state, or not running at all, mark task as `failed`
+	for id, t := range w.Db {
+		if t.State == sail.Running {
+			resp := w.InspectTask(t)
+			if resp.Error != nil {
+				fmt.Printf("ERROR: %v", resp.Error)
+			}
+
+			if resp.Container == nil {
+				log.Printf("No container for running task %s", id)
+				if state, ok := w.Db[id]; ok {
+					state.State = sail.Failed
+				}
+
+			}
+
+			if resp.Container.State.Status == "exited" {
+				log.Printf("Container for task %s in non-running state %s", id, resp.Container.State.Status)
+				if state, ok := w.Db[id]; ok {
+					state.State = sail.Failed
+				}
+			}
+
+			// task is running, update exposed ports
+			if state, ok := w.Db[id]; ok {
+				state.HostPorts = resp.Container.NetworkSettings.NetworkSettingsBase.Ports
+			}
+			// w.Db[id].HostPorts = resp.Container.NetworkSettings.NetworkSettingsBase.Ports
+		}
+	}
 }
