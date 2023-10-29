@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ashish493/ormen/sail"
+	"github.com/ashish493/ormen/stats"
 	"github.com/golang-collections/collections/queue"
 	"github.com/google/uuid"
 )
@@ -16,7 +17,7 @@ type Sailor struct {
 	Name      string
 	Queue     queue.Queue
 	Db        map[uuid.UUID]sail.Sail
-	Stats     *Stats
+	Stats     *stats.Stats
 	SailCount int
 }
 
@@ -39,7 +40,7 @@ func (w *Sailor) RunTasks() {
 func (s *Sailor) CollectStats() {
 	for {
 		log.Println("Collecting stats")
-		s.Stats = GetStats()
+		s.Stats = stats.GetStats()
 		s.SailCount = s.Stats.TaskCount
 		time.Sleep(15 * time.Second)
 	}

@@ -184,23 +184,40 @@ func main() {
 	// mhost := os.Getenv("CUBE_MANAGER_HOST")
 	// mport, _ := strconv.Atoi(os.Getenv("CUBE_MANAGER_PORT"))
 
-	fmt.Println("Starting Cube worker")
-
-	w := sailor.Sailor{
+	w1 := sailor.Sailor{
 		Queue: *queue.New(),
 		Db:    make(map[uuid.UUID]sail.Sail),
 	}
-	wapi := sailor.Api{Address: whost, Port: wport, Worker: &w}
+	wapi1 := sailor.Api{Address: whost, Port: wport, Worker: &w1}
 
-	go w.RunTasks()
-	go w.CollectStats()
-	go w.UpdateTasks()
-	go wapi.Start()
+	w2 := sailor.Sailor{
+		Queue: *queue.New(),
+		Db:    make(map[uuid.UUID]sail.Sail),
+	}
+	wapi2 := sailor.Api{Address: whost, Port: wport + 1, Worker: &w2}
+
+	w3 := sailor.Sailor{
+		Queue: *queue.New(),
+		Db:    make(map[uuid.UUID]sail.Sail),
+	}
+	wapi3 := sailor.Api{Address: whost, Port: wport + 2, Worker: &w3}
+
+	go w1.RunTasks()
+	go w1.UpdateTasks()
+	go wapi1.Start()
+
+	go w2.RunTasks()
+	go w2.UpdateTasks()
+	go wapi2.Start()
+
+	go w3.RunTasks()
+	go w3.UpdateTasks()
+	go wapi3.Start()
 
 	fmt.Println("Starting Cube manager")
 
 	workers := []string{fmt.Sprintf("%s:%d", whost, wport)}
-	m := deck.New(workers)
+	m := deck.New(workers, "roundrobin")
 	mapi := deck.Api{Address: mhost, Port: mport, Manager: m}
 
 	go m.ProcessTasks()
