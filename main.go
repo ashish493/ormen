@@ -1,19 +1,11 @@
 package main
 
 import (
-	"github.com/ashish493/ormen/deck"
-	"github.com/ashish493/ormen/sail"
-	"github.com/docker/docker/client"
-	"github.com/google/uuid"
-
-	"fmt"
-
-	"github.com/golang-collections/collections/queue"
-
-	"github.com/ashish493/ormen/sailor"
+	"github.com/ashish493/ormen/cmd"
 )
 
 func main() {
+	cmd.Execute()
 
 	//chapter -3
 	// s := sail.Sail{
@@ -175,90 +167,90 @@ func main() {
 
 	// whost := os.Getenv("CUBE_WORKER_HOST")
 	// wport, _ := strconv.Atoi(os.Getenv("CUBE_WORKER_PORT"))
-	whost := "localhost"
-	wport := 8080
+	// whost := "localhost"
+	// wport := 8080
 
-	mhost := "localhost"
-	mport := 8081
+	// mhost := "localhost"
+	// mport := 8081
 
 	// mhost := os.Getenv("CUBE_MANAGER_HOST")
 	// mport, _ := strconv.Atoi(os.Getenv("CUBE_MANAGER_PORT"))
 
-	w1 := sailor.Sailor{
-		Queue: *queue.New(),
-		Db:    make(map[uuid.UUID]sail.Sail),
-	}
-	wapi1 := sailor.Api{Address: whost, Port: wport, Worker: &w1}
+	// w1 := sailor.Sailor{
+	// 	Queue: *queue.New(),
+	// 	Db:    make(map[uuid.UUID]sail.Sail),
+	// }
+	// wapi1 := sailor.Api{Address: whost, Port: wport, Worker: &w1}
 
-	w2 := sailor.Sailor{
-		Queue: *queue.New(),
-		Db:    make(map[uuid.UUID]sail.Sail),
-	}
-	wapi2 := sailor.Api{Address: whost, Port: wport + 1, Worker: &w2}
+	// w2 := sailor.Sailor{
+	// 	Queue: *queue.New(),
+	// 	Db:    make(map[uuid.UUID]sail.Sail),
+	// }
+	// wapi2 := sailor.Api{Address: whost, Port: wport + 1, Worker: &w2}
 
-	w3 := sailor.Sailor{
-		Queue: *queue.New(),
-		Db:    make(map[uuid.UUID]sail.Sail),
-	}
-	wapi3 := sailor.Api{Address: whost, Port: wport + 2, Worker: &w3}
+	// w3 := sailor.Sailor{
+	// 	Queue: *queue.New(),
+	// 	Db:    make(map[uuid.UUID]sail.Sail),
+	// }
+	// wapi3 := sailor.Api{Address: whost, Port: wport + 2, Worker: &w3}
 
-	go w1.RunTasks()
-	go w1.UpdateTasks()
-	go wapi1.Start()
+	// go w1.RunTasks()
+	// go w1.UpdateTasks()
+	// go wapi1.Start()
 
-	go w2.RunTasks()
-	go w2.UpdateTasks()
-	go wapi2.Start()
+	// go w2.RunTasks()
+	// go w2.UpdateTasks()
+	// go wapi2.Start()
 
-	go w3.RunTasks()
-	go w3.UpdateTasks()
-	go wapi3.Start()
+	// go w3.RunTasks()
+	// go w3.UpdateTasks()
+	// go wapi3.Start()
 
-	fmt.Println("Starting Cube manager")
+	// fmt.Println("Starting Cube manager")
 
-	workers := []string{fmt.Sprintf("%s:%d", whost, wport)}
-	m := deck.New(workers, "roundrobin")
-	mapi := deck.Api{Address: mhost, Port: mport, Manager: m}
+	// workers := []string{fmt.Sprintf("%s:%d", whost, wport)}
+	// m := deck.New(workers, "roundrobin")
+	// mapi := deck.Api{Address: mhost, Port: mport, Manager: m}
 
-	go m.ProcessTasks()
-	go m.UpdateTasks()
-	go m.DoHealthChecks()
+	// go m.ProcessTasks()
+	// go m.UpdateTasks()
+	// go m.DoHealthChecks()
 
-	mapi.Start()
+	// mapi.Start()
 }
 
-func createContainer() (*sail.Docker, *sail.DockerResult) {
-	c := sail.Config{
-		Name:  "test-container-1",
-		Image: "postgres:13",
-		Env: []string{
-			"POSTGRES_USER=cube",
-			"POSTGRES_PASSWORD=secret",
-		},
-	}
-	dc, _ := client.NewClientWithOpts(client.FromEnv)
-	d := sail.Docker{
-		Client: dc,
-		Config: c,
-	}
-	result := d.Run()
-	if result.Error != nil {
-		fmt.Printf("%v\n", result.Error)
-		return nil, nil
-	}
-	fmt.Printf(
-		"Container %s is running with config %v\n", result.ContainerId, c)
-	return &d, &result
-}
+// func createContainer() (*sail.Docker, *sail.DockerResult) {
+// 	c := sail.Config{
+// 		Name:  "test-container-1",
+// 		Image: "postgres:13",
+// 		Env: []string{
+// 			"POSTGRES_USER=cube",
+// 			"POSTGRES_PASSWORD=secret",
+// 		},
+// 	}
+// 	dc, _ := client.NewClientWithOpts(client.FromEnv)
+// 	d := sail.Docker{
+// 		Client: dc,
+// 		Config: c,
+// 	}
+// 	result := d.Run()
+// 	if result.Error != nil {
+// 		fmt.Printf("%v\n", result.Error)
+// 		return nil, nil
+// 	}
+// 	fmt.Printf(
+// 		"Container %s is running with config %v\n", result.ContainerId, c)
+// 	return &d, &result
+// }
 
-func stopContainer(d *sail.Docker) *sail.DockerResult {
-	fmt.Println("config values", d.Config.Name)
-	result := d.Stop(d.Config.Name)
-	if result.Error != nil {
-		fmt.Printf("%v\n", result.Error)
-		return nil
-	}
-	fmt.Printf(
-		"Container %s has been stopped and removed\n", result.ContainerId)
-	return &result
-}
+// func stopContainer(d *sail.Docker) *sail.DockerResult {
+// 	fmt.Println("config values", d.Config.Name)
+// 	result := d.Stop(d.Config.Name)
+// 	if result.Error != nil {
+// 		fmt.Printf("%v\n", result.Error)
+// 		return nil
+// 	}
+// 	fmt.Printf(
+// 		"Container %s has been stopped and removed\n", result.ContainerId)
+// 	return &result
+// }

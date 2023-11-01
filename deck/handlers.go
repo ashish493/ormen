@@ -14,6 +14,7 @@ import (
 
 func (a *Api) StartTaskHandler(w http.ResponseWriter, r *http.Request) {
 	d := json.NewDecoder(r.Body)
+	d.DisallowUnknownFields()
 
 	te := sail.SailEvent{}
 	err := d.Decode(&te)
@@ -49,10 +50,11 @@ func (a *Api) StopTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tID, _ := uuid.Parse(taskID)
-	_, ok := a.Manager.TaskDb[tID]
-	if !ok {
-		log.Printf("No sail with ID %v found", tID)
+	taskToStop, err := a.Manager.TaskDb.Get(tID.String())
+	if err != nil {
+		log.Printf("No task with ID %v found", tID)
 		w.WriteHeader(404)
+		return
 	}
 
 	te := sail.SailEvent{
@@ -60,13 +62,18 @@ func (a *Api) StopTaskHandler(w http.ResponseWriter, r *http.Request) {
 		State:     sail.Completed,
 		Timestamp: time.Now(),
 	}
-	taskToStop := a.Manager.TaskDb[tID]
-	// we need to make a copy so we are not modifying the sail in the datastore
-	taskCopy := *taskToStop
-	taskCopy.State = sail.Completed
-	te.Sail = taskCopy
+
+	taskCopy := taskToStop.(*sail.Sail)
+	// taskCopy.State = sail.Completed
+	te.Sail = *taskCopy
 	a.Manager.AddTask(te)
 
-	log.Printf("Added sail event %v to stop task %v\n", te.ID, taskToStop.ID)
+	log.Printf("Added sail event %v to stop task %v\n", te.ID, taskCopy.ID)
 	w.WriteHeader(204)
+}
+
+func (a *Api) GetNodesHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	json.NewEncoder(w).Encode(a.Manager.WorkerNodes)
 }

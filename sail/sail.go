@@ -3,9 +3,9 @@ package sail
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
+	"math"
 	"os"
 	"time"
 
@@ -71,9 +71,8 @@ type Config struct {
 }
 
 type Docker struct {
-	Client      *client.Client
-	Config      Config
-	ContainerId string
+	Client *client.Client
+	Config Config
 }
 
 type DockerResult struct {
@@ -110,10 +109,9 @@ func NewDocker(c *Config) *Docker {
 
 func (d *Docker) Run() DockerResult {
 	ctx := context.Background()
-	reader, err := d.Client.ImagePull(
-		ctx, d.Config.Image, types.ImagePullOptions{})
+	reader, err := d.Client.ImagePull(ctx, d.Config.Image, types.ImagePullOptions{})
 	if err != nil {
-		log.Printf("Error pulling image %s", d.Config.Image)
+		log.Printf("Error pulling image %s: %v\n", d.Config.Image, err)
 		return DockerResult{Error: err}
 	}
 	io.Copy(os.Stdout, reader)
@@ -121,20 +119,24 @@ func (d *Docker) Run() DockerResult {
 	rp := container.RestartPolicy{
 		Name: d.Config.RestartPolicy,
 	}
+
 	r := container.Resources{
-		Memory: d.Config.Memory,
+		Memory:   d.Config.Memory,
+		NanoCPUs: int64(d.Config.Cpu * math.Pow(10, 9)),
 	}
-	cc := container.Config{
-		Image: d.Config.Image,
-		Env:   d.Config.Env,
-	}
+
 	hc := container.HostConfig{
 		RestartPolicy:   rp,
 		Resources:       r,
 		PublishAllPorts: true,
 	}
 
-	resp, err := d.Client.ContainerCreate(ctx, &cc, &hc, nil, nil, d.Config.Name)
+	resp, err := d.Client.ContainerCreate(ctx, &container.Config{
+		Image:        d.Config.Image,
+		Tty:          false,
+		Env:          d.Config.Env,
+		ExposedPorts: d.Config.ExposedPorts,
+	}, &hc, nil, nil, d.Config.Name)
 	if err != nil {
 		log.Printf("Error creating container using image %s: %v\n", d.Config.Image, err)
 		return DockerResult{Error: err}
@@ -154,29 +156,28 @@ func (d *Docker) Run() DockerResult {
 	stdcopy.StdCopy(os.Stdout, os.Stderr, out)
 
 	return DockerResult{ContainerId: resp.ID, Action: "start", Result: "success"}
+}
 
+func (d *Docker) Remove(id string) DockerResult {
+	log.Printf("Attempting to remove container %v", id)
+	ctx := context.Background()
+	err := d.Client.ContainerRemove(ctx, id, types.ContainerRemoveOptions{RemoveVolumes: true, RemoveLinks: false, Force: false})
+	if err != nil {
+		log.Printf("Error removing container %s: %v\n", id, err)
+		return DockerResult{Error: err}
+	}
+
+	return DockerResult{Action: "remove", Result: "success", Error: nil}
 }
 
 func (d *Docker) Stop(id string) DockerResult {
 	log.Printf("Attempting to stop container %v", id)
 	ctx := context.Background()
-	// cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// defer cli.Close()
-
-	noWaitTimeout := 0
-	err := d.Client.ContainerStop(ctx, id, container.StopOptions{Timeout: &noWaitTimeout})
-	// err = cli.ContainerStop(ctx, id, container.StopOptions{Timeout: &noWaitTimeout})
+	var options container.StopOptions
+	err := d.Client.ContainerStop(ctx, id, options)
 	if err != nil {
-		fmt.Println(err)
-		panic(err)
-	}
-
-	err = d.Client.ContainerRemove(ctx, id, types.ContainerRemoveOptions{RemoveVolumes: true, RemoveLinks: false, Force: false})
-	if err != nil {
-		panic(err)
+		log.Printf("Error stopping container %s: %v\n", id, err)
+		return DockerResult{Error: err}
 	}
 
 	return DockerResult{Action: "stop", Result: "success", Error: nil}

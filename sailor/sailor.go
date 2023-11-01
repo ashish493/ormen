@@ -9,16 +9,39 @@ import (
 
 	"github.com/ashish493/ormen/sail"
 	"github.com/ashish493/ormen/stats"
+	"github.com/ashish493/ormen/store"
 	"github.com/golang-collections/collections/queue"
-	"github.com/google/uuid"
 )
 
 type Sailor struct {
-	Name      string
-	Queue     queue.Queue
-	Db        map[uuid.UUID]sail.Sail
+	Name  string
+	Queue queue.Queue
+	Db    store.Store
+	//Db        map[uuid.UUID]*task.Task
 	Stats     *stats.Stats
 	SailCount int
+}
+
+func New(name string, taskDbType string) *Sailor {
+	w := Sailor{
+		Name:  name,
+		Queue: *queue.New(),
+	}
+
+	var s store.Store
+	var err error
+	switch taskDbType {
+	case "memory":
+		s = store.NewInMemoryTaskStore()
+	case "persistent":
+		filename := fmt.Sprintf("%s_tasks.db", name)
+		s, err = store.NewTaskStore(filename, 0600, "tasks")
+	}
+	if err != nil {
+		log.Printf("unable to create new task store: %v", err)
+	}
+	w.Db = s
+	return &w
 }
 
 func (w *Sailor) RunTasks() {
@@ -46,12 +69,14 @@ func (s *Sailor) CollectStats() {
 	}
 }
 
-func (s *Sailor) GetTasks() []*sail.Sail {
-	tasks := []*sail.Sail{}
-	for _, t := range s.Db {
-		tasks = append(tasks, &t)
+func (w *Sailor) GetTasks() []*sail.Sail {
+	taskList, err := w.Db.List()
+	if err != nil {
+		log.Printf("error getting list of tasks: %v", err)
+		return nil
 	}
-	return tasks
+
+	return taskList.([]*sail.Sail)
 }
 
 func (s *Sailor) Collections() {
@@ -61,76 +86,96 @@ func (s *Sailor) AddTask(t sail.Sail) {
 	s.Queue.Enqueue(t)
 }
 
-func (s *Sailor) runTask() sail.DockerResult {
-	fmt.Println("Task will run ")
-	t := s.Queue.Dequeue()
+func (w *Sailor) runTask() sail.DockerResult {
+	t := w.Queue.Dequeue()
 	if t == nil {
-		log.Println("No tasks in the queue")
+		log.Println("[worker] No sails in the queue")
 		return sail.DockerResult{Error: nil}
 	}
 
 	taskQueued := t.(sail.Sail)
+	fmt.Printf("[worker] Found task in queue: %v:\n", taskQueued)
 
-	taskPersisted := s.Db[taskQueued.ID]
-	fmt.Println(taskQueued, "taskqueued")
-	// if taskPersisted == nil {
-	// 	taskPersisted = taskQueued
-	// 	s.Db[taskQueued.ID] = taskQueued
-	// }
+	err := w.Db.Put(taskQueued.ID.String(), &taskQueued)
+	if err != nil {
+		msg := fmt.Errorf("error storing task %s: %v", taskQueued.ID.String(), err)
+		log.Println(msg)
+		return sail.DockerResult{Error: msg}
+	}
 
-	var result sail.DockerResult
+	result, err := w.Db.Get(taskQueued.ID.String())
+	if err != nil {
+		msg := fmt.Errorf("error getting task %s from database: %v", taskQueued.ID.String(), err)
+		log.Println(msg)
+		return sail.DockerResult{Error: msg}
+	}
+
+	taskPersisted := *result.(*sail.Sail)
+
+	if taskPersisted.State == sail.Completed {
+		return w.StopTask(taskPersisted)
+	}
+
+	var dockerResult sail.DockerResult
 	if sail.ValidStateTransition(taskPersisted.State, taskQueued.State) {
 		switch taskQueued.State {
 		case sail.Scheduled:
-			result = s.StartTask(taskQueued)
-		case sail.Completed:
-			result = s.StopTask(taskQueued)
+			if taskQueued.ContainerID != "" {
+				dockerResult = w.StopTask(taskQueued)
+				if dockerResult.Error != nil {
+					log.Printf("%v\n", dockerResult.Error)
+				}
+			}
+			dockerResult = w.StartTask(taskQueued)
 		default:
-			result.Error = errors.New("We should not get here")
+			fmt.Printf("This is a mistake. taskPersisted: %v, taskQueued: %v\n", taskPersisted, taskQueued)
+			dockerResult.Error = errors.New("We should not get here")
 		}
 	} else {
 		err := fmt.Errorf("Invalid transition from %v to %v", taskPersisted.State, taskQueued.State)
-		result.Error = err
-		return result
+		dockerResult.Error = err
+		return dockerResult
 	}
-	return result
-
+	return dockerResult
 }
 
-func (s *Sailor) StopTask(t sail.Sail) sail.DockerResult {
-	config := sail.NewConfig(&t)
-	d := sail.NewDocker(config)
-
-	result := d.Stop(t.ContainerID)
-	if result.Error != nil {
-		log.Printf("Error stopping container %v: %v", t.ContainerID, result.Error)
-	}
-	t.FinishTime = time.Now().UTC()
-	t.State = sail.Completed
-	s.Db[t.ID] = t
-	log.Printf("Stopped and removed container %v for sail %v", t.ContainerID, t.ID)
-
-	return result
-}
-
-func (s *Sailor) StartTask(t sail.Sail) sail.DockerResult {
-	fmt.Println("Task will get started")
-	t.StartTime = time.Now().UTC()
+func (w *Sailor) StartTask(t sail.Sail) sail.DockerResult {
 	config := sail.NewConfig(&t)
 	d := sail.NewDocker(config)
 	result := d.Run()
 	if result.Error != nil {
 		log.Printf("Err running sail %v: %v\n", t.ID, result.Error)
 		t.State = sail.Failed
-		s.Db[t.ID] = t
+		w.Db.Put(t.ID.String(), &t)
 		return result
 	}
 
 	t.ContainerID = result.ContainerId
 	t.State = sail.Running
-	s.Db[t.ID] = t
+	w.Db.Put(t.ID.String(), &t)
 
 	return result
+}
+
+func (w *Sailor) StopTask(t sail.Sail) sail.DockerResult {
+	config := sail.NewConfig(&t)
+	d := sail.NewDocker(config)
+
+	stopResult := d.Stop(t.ContainerID)
+	if stopResult.Error != nil {
+		log.Printf("%v\n", stopResult.Error)
+	}
+	removeResult := d.Remove(t.ContainerID)
+	if removeResult.Error != nil {
+		log.Printf("%v\n", removeResult.Error)
+	}
+
+	t.FinishTime = time.Now().UTC()
+	t.State = sail.Completed
+	w.Db.Put(t.ID.String(), &t)
+	log.Printf("Stopped and removed container %v for sail %v\n", t.ContainerID, t.ID)
+
+	return removeResult
 }
 
 func (w *Sailor) InspectTask(t sail.Sail) sail.DockerInspectResponse {
@@ -154,33 +199,33 @@ func (w *Sailor) updateTasks() {
 	// 1. call InspectTask method
 	// 2. verify task is in running state
 	// 3. if task is not in running state, or not running at all, mark task as `failed`
-	for id, t := range w.Db {
+	tasks, err := w.Db.List()
+	if err != nil {
+		log.Printf("error getting list of tasks: %v", err)
+		return
+	}
+	for _, t := range tasks.([]*sail.Sail) {
 		if t.State == sail.Running {
-			resp := w.InspectTask(t)
+			resp := w.InspectTask(*t)
 			if resp.Error != nil {
 				fmt.Printf("ERROR: %v", resp.Error)
 			}
 
 			if resp.Container == nil {
-				log.Printf("No container for running task %s", id)
-				if state, ok := w.Db[id]; ok {
-					state.State = sail.Failed
-				}
-
+				log.Printf("No container for running task %s", t.ID)
+				t.State = sail.Failed
+				w.Db.Put(t.ID.String(), t)
 			}
 
 			if resp.Container.State.Status == "exited" {
-				log.Printf("Container for task %s in non-running state %s", id, resp.Container.State.Status)
-				if state, ok := w.Db[id]; ok {
-					state.State = sail.Failed
-				}
+				log.Printf("Container for task %s in non-running state %s", t.ID, resp.Container.State.Status)
+				t.State = sail.Failed
+				w.Db.Put(t.ID.String(), t)
 			}
 
 			// task is running, update exposed ports
-			if state, ok := w.Db[id]; ok {
-				state.HostPorts = resp.Container.NetworkSettings.NetworkSettingsBase.Ports
-			}
-			// w.Db[id].HostPorts = resp.Container.NetworkSettings.NetworkSettingsBase.Ports
+			t.HostPorts = resp.Container.NetworkSettings.NetworkSettingsBase.Ports
+			w.Db.Put(t.ID.String(), t)
 		}
 	}
 }

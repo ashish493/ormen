@@ -1,5 +1,7 @@
 package sail
 
+import "log"
+
 type State int
 
 const (
@@ -9,6 +11,10 @@ const (
 	Completed
 	Failed
 )
+
+func (s State) String() []string {
+	return []string{"Pending", "Scheduled", "Running", "Completed", "Failed"}
+}
 
 var stateTransitionMap = map[State][]State{
 	Pending:   []State{Scheduled},
@@ -28,5 +34,6 @@ func Contains(states []State, state State) bool {
 }
 
 func ValidStateTransition(src State, dst State) bool {
+	log.Printf("attempting to transition from %#v to %#v\n", src, dst)
 	return Contains(stateTransitionMap[src], dst)
 }
