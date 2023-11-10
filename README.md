@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 <p align="center">
-    <img width="300" height="300" src="ormen-logo.png" alt="K8s-authz" />
+    <img width="300" height="300" src="ormen-logo.png" alt="Ormen-Logo" />
 </p>
 
 Ormen is a toy Orchestrator written in go based on Vikings theme. 
