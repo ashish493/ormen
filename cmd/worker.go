@@ -19,7 +19,7 @@ func init() {
 }
 
 var sailorCmd = &cobra.Command{
-	Use:   "worker",
+	Use:   "sailor",
 	Short: "Worker command to operate a Cube worker node.",
 	Long: `cube worker command.
 

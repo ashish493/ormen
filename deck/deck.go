@@ -93,7 +93,12 @@ func New(workers []string, schedulerType string, dbType string) *Deck {
 }
 
 func (m *Deck) SelectWorker(t sail.Sail) (*mast.Mast, error) {
+	log.Println("selcetworker called with input -->", t)
+	log.Println("m pointer -->", m)
+	log.Println("m value -->", &m)
+	log.Println("workerNodes -->", m.WorkerNodes)
 	candidates := m.Rudder.SelectCandidateNodes(t, m.WorkerNodes)
+	log.Println("after error selcetworker -->", t)
 	if candidates == nil {
 		msg := fmt.Sprintf("No available candidates match resource request for task %v", t.ID)
 		err := errors.New(msg)
@@ -326,6 +331,8 @@ func (m *Deck) stopTask(worker string, taskID string) {
 }
 
 func (m *Deck) SendWork() {
+	log.Println("sendwork m pointer -->", m)
+	log.Println("sendwork m value -->", &m)
 	if m.Pending.Len() > 0 {
 		e := m.Pending.Dequeue()
 		te := e.(sail.SailEvent)
