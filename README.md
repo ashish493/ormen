@@ -1,13 +1,41 @@
 # Ormen 
 [![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/ashish493/ormen/issues)
-<!-- [![Go Report Card](https://goreportcard.com/badge/github.com/casbin/k8s-authz)](https://goreportcard.com/report/github.com/casbin/k8s-authz) -->
+ [![Go Report Card](https://goreportcard.com/badge/github.com/ashish493/ormen)](https://goreportcard.com/report/github.com/ashish493/ormen)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 <p align="center">
-    <img width="300" height="300" src="ormen-logo.png" alt="Ormen-Logo" />
+  <img width="490" height="450" src="https://github.com/ashish493/ormen/assets/44671044/3adcf224-922c-41a8-ba4c-788830fcb3ce">
 </p>
 
-Ormen is a toy Orchestrator written in go based on Vikings theme. 
+## About the Project 
+Ormen is a toy Orchestrator written in go based on Vikings theme. The name Ormen is derived from Ormen Lange, which was one of the most famous of the Viking longships. It was also known as the The Long Serpent, and was the largest and most powerful longship of its day. Longships were the epitome of Scandinavian naval power at the time and were used by the Norse in warfare. 
+
+### Relation between ships and orchestrator
+
+There is an analogical similarity between a ship and an orchestrator. Both are responsible for coordinating various components, adapting to changing 
+conditions, optimizing performance, and ultimately ensuring the successful achievement of their respective goals. 
+
+- Ships are designed for transportation where it navigates through complex environments, overcoming challenges like weather conditions and varying water depths whereas the Orchestrators coordinate and manage the flow of tasks and services, navigating through the intricacies of software deployment, resource allocation, and overall system efficiency.
+
+- Ships optimize routes, manage fuel consumption, and maintain the vessel to ensure it operates at peak performance. Orchestrators optimize IT workflows by automating tasks, managing resources efficiently, and ensuring that applications run smoothly, minimizing downtime and maximizing performance.
+
+- Ships adapt to changing conditions at sea, adjusting their course based on factors like weather, currents, and potential obstacles and Orchestrators adapt to changes in the IT environment, dynamically allocating resources, adjusting workflows, and responding to changes in demand or system conditions.
+
+Below is the Analogical comparison between ships and orchestrator.
+
+<p align="center">
+  <img width="500" height="370" src="https://github.com/ashish493/ormen/assets/44671044/a6cc7439-6b31-4527-b637-3ecc8b1d1cd3">
+</p>
+
+### Technical Details
+
+This project is completely written in go. 
+
+- Bolt Db is used for persistent storage of tasks. 
+- Cobra to manage CLI commands
+- chi to manage api routings 
+- goprocinfo to monitor the cpu usage
+- Docker SDK to manage containers  
 
 ## Installation 
 
@@ -17,10 +45,6 @@ go get github.com/ashish493/ormen
 
 ## Requirements
 Since we are orchestrating the Docker containers, we need a running Docker Daemon before running this application. 
-
-## Relation between ships and orchestrator
-
-
 
 ## Usage
 
@@ -135,3 +159,5 @@ You can refer the [task1.json](https://github.com/ashish493/ormen/blob/main/task
 
 
 ## Acknowledgement
+
+I took inspiration of this project from the book [Build an Orchestrator in Go (From Scratch)](https://www.simonandschuster.com/books/Build-an-Orchestrator-in-Go-(From-Scratch)/Tim-Boring/From-Scratch/9781617299759). I would like to thank [Tim Boring](https://www.simonandschuster.com/authors/Tim-Boring/191341900) for writing this book in a very detailed manner, which really helped me in building this project. 
