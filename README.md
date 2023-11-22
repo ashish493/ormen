@@ -1,7 +1,7 @@
 # Ormen 
 [![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/ashish493/ormen/issues)
  [![Go Report Card](https://goreportcard.com/badge/github.com/ashish493/ormen)](https://goreportcard.com/report/github.com/ashish493/ormen)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 <p align="center">
   <img width="490" height="450" src="https://github.com/ashish493/ormen/assets/44671044/3adcf224-922c-41a8-ba4c-788830fcb3ce">
